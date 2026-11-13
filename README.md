@@ -26,18 +26,30 @@ The application reads a shopping basket and prints its receipt: each item with i
 
 ## Assumptions
 
-- **Product type comes from keywords in the name.** The keywords cover the problem description's examples plus a few common words, and they live in one constant, so the list is easy to extend:
+- **Product type comes from keywords in the name.** The keywords cover the problem description's examples plus a few common words, and they are all listed in `Catalog::Category`, so the list is easy to extend:
   - Books: book, novel, textbook, paperback, encyclopedia.
   - Food: chocolate, bread, cheese, coffee, tea, fruit.
   - Medical: pill, tablet, medicine, syrup, bandage, vitamin.
 
-  Singular, plural (an added "s" or "es") and any letter case match, but only as whole words, so "notebook" is not a book and "pillow" is not medical. Any other product is taxed, because the problem description exempts only those three types. A real system would take the type from its product catalog.
+  A keyword matches in singular or plural (an added "s" or "es") and in any letter case, but only as a whole word:
+  - "old BOOKS" is a book;
+  - "notebook" is not a book, and "pillow" is not medical.
+
+  Any other product is taxed, because the problem description exempts only these three types. A real system would take the type from its product catalog.
 - **"imported" is a whole word anywhere in the name**, in any letter case. The name is printed exactly as it was written.
-- **Tax is calculated per unit, then multiplied by the quantity.** The problem description's third example needs it: 3 imported boxes of chocolates at 11.25 print 35.55, which is 3 × (11.25 + 0.60). Taxing the whole line (33.75 → 1.70) would print 35.45.
-- **Each tax is rounded on its own**, then the two are added. The problem description gives the rule per tax rate ("for a tax rate of n%..."), and in practice each tax is a separate obligation. Rounding the combined 15% once would also match its examples, so this choice is stated here and covered by a test where the two readings differ.
-- **Prices** have up to two decimals and must be greater than zero; `12`, `12.5` and `12.50` are accepted. A comma is not accepted as the decimal mark, because `1,000` would be ambiguous.
+- **Tax is calculated per unit, then multiplied by the quantity.** The problem description's third example needs it. For 3 imported boxes of chocolates at 11.25:
+  - per unit: 3 × (11.25 + 0.60) = 35.55, the expected output;
+  - on the whole line: 33.75 + 1.70 = 35.45, which does not match.
+- **Each tax is rounded on its own**, then the two are added. The problem description gives the rule per tax rate ("for a tax rate of n%..."), and in practice each tax is a separate obligation. Rounding the combined 15% once also matches its examples, but not every price. At 1.01:
+  - each tax on its own: 0.15 + 0.10 = 0.25;
+  - the combined 15% once: 0.1515, rounded to 0.20.
+
+  A test covers this case.
+- **Prices** have up to two decimals and must be greater than zero:
+  - accepted: `12`, `12.5`, `12.50`;
+  - rejected: `12.505`, `0`, `-1`, `12,50` (a comma would make `1,000` ambiguous).
 - **Quantities** are whole numbers greater than zero.
-- **The last " at " separates the name from the price**, so names may contain "at" or numbers (`1 painting of a cat at night at 12.00`).
+- **The last " at " separates the name from the price**, so names may contain "at" or numbers, as in `1 painting of a cat at night at 12.00`.
 - **One invalid line rejects its whole basket**, because a receipt missing an item would be wrong.
 - **Lines keep their input order**, and the same product on two lines prints as two lines.
 
@@ -60,9 +72,57 @@ bundle exec rspec
 
 ## Design
 
+The code is in `lib/sales_taxes`, one class per file, grouped by module:
+
+| Module | Classes | Job |
+|---|---|---|
+| `Money` | | Turns price text into Integer cents and back |
+| `Catalog` | `Category`, `Product` | What is being bought |
+| `Taxes` | `Rounding`, `BasicSalesTax`, `ImportDuty`, `Calculator` | How much tax one unit pays |
+| `Checkout` | `LineItem`, `Receipt`, `ReceiptFormatter` | The basket, its totals and the printed text |
+
+Objects hold each other instead of inheriting from each other:
+- a `Product` has a `Category`;
+- a `LineItem` has a quantity and a `Product`;
+- a `Receipt` is built from `LineItem`s and a `Calculator`;
+- a `Calculator` has a list of tax rules.
+
+**Tax rules are composed, not inherited.** Each rule is a small class that answers `amount_for(product)`, and `Calculator` adds up whatever rules it is given. A new tax is a new class passed to the calculator, with no change to the others. The two rules only share the rounding, which is already its own module (`Taxes::Rounding`), so a base class would save two lines and tie the rules together.
+
+**Exemptions belong to the tax, not to the category.** `BasicSalesTax` keeps the list of exempt categories, because the exemption is part of that tax's rule. The import duty has no exemptions.
+
+**Errors.** Every input problem the user can cause is a subclass of `SalesTaxes::Error` (`InputFileError`, `EmptyBasketError`, `MalformedLineError`, `InvalidValueError`). Anything else is a bug and is not rescued. For example, a negative value reaching `Taxes::Rounding` can only come from a bug, so it raises a plain `ArgumentError`.
+
+**Thread safety.** Every object is frozen once it is built, inner lists included, and no object changes after that. The same calculator or receipt can be shared between threads without locks.
+
 ## How taxes are calculated
 
+For each unit, every rule returns its tax already rounded up to the nearest 0.05, and `Calculator` adds them. In cents:
+
+```
+tax = (price × rate / 100) rounded up to a multiple of 5
+    = (price × rate).ceildiv(500) × 5
+```
+
+`ceildiv` is Ruby's integer division that rounds up, so the whole calculation stays in integers. For an imported, taxable product at 1.01:
+
+| Rule | Exact | Rounded |
+|---|---|---|
+| Basic sales tax (10%) | 0.101 | 0.15 |
+| Import duty (5%) | 0.0505 | 0.10 |
+| Tax for one unit | | 0.25 |
+
+Each receipt line costs (unit price + unit tax) × quantity. Sales Taxes and Total are the sums of the lines.
+
 ## Money representation
+
+Prices are Integer cents from the moment they are read until they are printed.
+
+- **Float** cannot store most decimal values exactly (`0.1 + 0.2` is `0.30000000000000004`), and a receipt must be exact to the cent.
+- **Rational** would be exact, but it is more than this problem needs. Prices have at most two decimals and taxes are rounded to 0.05, so every value is a whole number of cents.
+- **BigDecimal** would also be exact, but since Ruby 3.4 it is a bundled gem that has to be added to the Gemfile, and the problem description asks for no external libraries.
+
+`Money` is the only place that converts between text and cents, so the rest of the code only sees integers.
 
 ## What was left out
 
