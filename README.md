@@ -26,7 +26,7 @@ Errors: when the basket has a problem (a line in the wrong format, a zero quanti
 
 ## Assumptions
 
-- The input must follow the format of the problem description: the quantity in digits, the name, " at " and a price with two decimals (`12.49`, or `.90` below one), all separated by single spaces. Extra spaces, tabs, `12.5` or `AT` are rejected with the line number. I chose not to guess, because a wrong guess prints a wrong receipt. Blank lines are skipped, lines can end in LF, CRLF or CR, and a byte order mark at the start is ignored.
+- The input follows a strict format, based on the problem description: the quantity in digits, the name, " at " and a price with two decimals (`12.49`, or the short form `.90` below one), all separated by single spaces. Extra spaces, tabs, `12.5` or `AT` are rejected with the line number. I chose not to guess, because a wrong guess prints a wrong receipt. Blank lines are skipped, lines can end in LF, CRLF or CR, and a byte order mark at the start is ignored.
 - Quantities and prices must be greater than zero.
 - The product type comes from keywords in the name, listed in `Catalog::Category`:
   - Books: book, novel, textbook, paperback, encyclopedia.
@@ -75,7 +75,7 @@ Total: 42.32
 
 Without a file, the basket is read from standard input:
 - piped: `cat input/basket_2.txt | bin/receipt`;
-- typed: run `bin/receipt`, type one item per line and finish with an empty line. A hint on stderr says so.
+- typed: run `bin/receipt`, type one item per line and finish with an empty line. A hint on stderr says so. If no hint appears, Ruby did not detect a terminal (this can happen in Git Bash): finish with Ctrl+D, or Ctrl+Z and Enter on Windows.
 
 On Windows cmd or PowerShell, run it with Ruby: `ruby bin/receipt input/basket_1.txt`.
 
@@ -104,7 +104,7 @@ The code is in `lib/sales_taxes`. Each class or module has its own file, except 
 | `SalesTaxes` (top level) | `InputParser` | Turns the basket text into line items |
 | `SalesTaxes` (top level) | `CLI` | Reads a file or standard input and prints the receipt |
 
-The objects use composition, not inheritance:
+How the objects relate:
 - `Product` has a `Category`;
 - `LineItem` has a quantity and a `Product`;
 - `Receipt` is built from `LineItem`s and a `Calculator`;
@@ -153,7 +153,7 @@ What I would add with more time, or in a real system:
 - A product catalog. Today the type and the import flag are guessed from the name in `Catalog::Product.from_name`, and a catalog lookup would replace that method.
 - Irregular plurals and other word forms, for example with `ActiveSupport::Inflector`. It is an external library, which the problem description does not allow, and all keywords today have a regular plural.
 - Decimal tax rates, like 2.5%. Today the rates are whole percentages.
-- A more forgiving input format, with extra spaces, tabs or prices like `12.5`. Today the input must follow the format of the problem description exactly.
+- A more forgiving input format, with extra spaces, tabs or prices like `12.5`. Today the input must follow a strict format.
 - Several files in one call. Today a shell loop does the same: `for f in input/*.txt; do bin/receipt "$f"; done`.
 - `--help` and Ctrl+C handling.
 - Reporting all invalid lines at once. Today the first invalid line stops the basket, and the error shows its line number.

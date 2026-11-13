@@ -64,8 +64,9 @@ RSpec.describe SalesTaxes::CLI do
       expect(run(stdin: "1 desk lamp at 20.01\n\n1 paperback novel at 10.00\n")).to eq([0, receipt, ""])
     end
 
-    it "shows a hint on stderr and stops at the first empty line when someone types" do
-      typed = "1 paperback novel at 10.00\n\n1 desk lamp at 20.01\n"
+    # Empty lines before the first item are ignored; the first empty line after it ends the basket.
+    it "shows a hint on stderr and stops at the empty line after the items when someone types" do
+      typed = "\n1 paperback novel at 10.00\n  \n1 desk lamp at 20.01\n"
 
       expect(run(stdin: typed, tty: true)).to eq(
         [0, "1 paperback novel: 10.00\nSales Taxes: 0.00\nTotal: 10.00\n", "#{described_class::TYPING_HINT}\n"]

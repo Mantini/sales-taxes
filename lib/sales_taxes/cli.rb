@@ -5,7 +5,7 @@ module SalesTaxes
   # is given, prints its receipt and returns the exit status: 0 when it worked, 1 when not.
   class CLI
     USAGE = "Usage: bin/receipt [basket file]. With no file, it reads the basket from standard input."
-    TYPING_HINT = "Type one item per line as \"#{InputParser::FORMAT}\", with the price as X.XX, " \
+    TYPING_HINT = "Type one item per line as \"#{InputParser::FORMAT}\", with the price as X.XX or .XX, " \
                   "and an empty line to finish."
 
     def initialize(stdin: $stdin, stdout: $stdout, stderr: $stderr, parser: InputParser.new,
@@ -40,14 +40,19 @@ module SalesTaxes
       1
     end
 
-    # Someone typing at a terminal finishes with an empty line. Piped input is read to the end,
-    # so a blank line inside a piped file does not cut the basket short.
+    # Someone typing at a terminal finishes with an empty line after the items. Piped input is
+    # read to the end, so a blank line inside a piped file does not cut the basket short.
     def stdin_text
       return @stdin.read.force_encoding(Encoding::UTF_8) unless @stdin.tty?
 
       @stderr.puts TYPING_HINT
-      # .b compares the raw bytes, so a typed line that is not valid text cannot break the check.
-      @stdin.each_line.take_while { |line| !line.b.strip.empty? }.join.force_encoding(Encoding::UTF_8)
+      typed = @stdin.each_line.lazy.drop_while { |line| empty_line?(line) }.take_while { |line| !empty_line?(line) }
+      typed.to_a.join.force_encoding(Encoding::UTF_8)
+    end
+
+    # Checks the raw bytes, so a typed line that is not valid text still reaches the parser's error.
+    def empty_line?(line)
+      line.b.strip.empty?
     end
 
     def file_text(path)
