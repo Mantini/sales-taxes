@@ -26,15 +26,15 @@ The application reads a shopping basket and prints its receipt: each item with i
 
 ## Assumptions
 
-- **Product type comes from keywords in the name.** The keywords cover the statement's examples plus a few common words, and they live in one constant, so the list is easy to extend:
-  - Books: book, novel, textbook, paperback, dictionary.
+- **Product type comes from keywords in the name.** The keywords cover the problem description's examples plus a few common words, and they live in one constant, so the list is easy to extend:
+  - Books: book, novel, textbook, paperback, encyclopedia.
   - Food: chocolate, bread, cheese, coffee, tea, fruit.
   - Medical: pill, tablet, medicine, syrup, bandage, vitamin.
 
-  Singular, plural (an added "s" or "es") and any letter case match, but only as whole words, so "notebook" is not a book and "pillow" is not medical. Any other product is taxed, because the statement exempts only those three types. A real system would take the type from its product catalog.
+  Singular, plural (an added "s" or "es") and any letter case match, but only as whole words, so "notebook" is not a book and "pillow" is not medical. Any other product is taxed, because the problem description exempts only those three types. A real system would take the type from its product catalog.
 - **"imported" is a whole word anywhere in the name**, in any letter case. The name is printed exactly as it was written.
-- **Tax is calculated per unit, then multiplied by the quantity.** The statement's third example needs it: 3 imported boxes of chocolates at 11.25 print 35.55, which is 3 × (11.25 + 0.60). Taxing the whole line (33.75 → 1.70) would print 35.45.
-- **Each tax is rounded on its own**, then the two are added. The statement gives the rule per tax rate ("for a tax rate of n%..."), and in practice each tax is a separate obligation. Rounding the combined 15% once would also match the statement's examples, so this choice is stated here and covered by a test where the two readings differ.
+- **Tax is calculated per unit, then multiplied by the quantity.** The problem description's third example needs it: 3 imported boxes of chocolates at 11.25 print 35.55, which is 3 × (11.25 + 0.60). Taxing the whole line (33.75 → 1.70) would print 35.45.
+- **Each tax is rounded on its own**, then the two are added. The problem description gives the rule per tax rate ("for a tax rate of n%..."), and in practice each tax is a separate obligation. Rounding the combined 15% once would also match its examples, so this choice is stated here and covered by a test where the two readings differ.
 - **Prices** have up to two decimals and must be greater than zero; `12`, `12.5` and `12.50` are accepted. A comma is not accepted as the decimal mark, because `1,000` would be ambiguous.
 - **Quantities** are whole numbers greater than zero.
 - **The last " at " separates the name from the price**, so names may contain "at" or numbers (`1 painting of a cat at night at 12.00`).
@@ -66,6 +66,6 @@ bundle exec rspec
 
 ## What was left out
 
-- Matching irregular plurals and other word forms (for example with `ActiveSupport::Inflector` or a stemmer). The statement does not allow external libraries, and every keyword in the list has a regular plural, so an optional "s" or "es" is enough.
+- Matching irregular plurals and other word forms (for example with `ActiveSupport::Inflector` or a stemmer). The problem description does not allow external libraries, and every keyword in the list has a regular plural, so an optional "s" or "es" is enough.
 - Taking the product type from a product catalog, or from a category list kept by the business, instead of keywords in the name. The type is decided in one place, so its source can change without touching the rest of the code.
 - Reporting every invalid line of a file at once (with a cap, so a badly formatted file does not flood the output). Today the first invalid line stops that file, and its error names the line, the product and the field.
