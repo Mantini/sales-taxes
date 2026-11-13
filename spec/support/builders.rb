@@ -1,14 +1,13 @@
 # frozen_string_literal: true
 
-# Builds objects the same way in every spec, with the category taken from the name.
+# Builds products from a name, the same way the parser does, plus line items and receipts.
 module Builders
-  def build_product(name, price_cents, imported: false)
-    SalesTaxes::Catalog::Product.new(name:, price_cents:, imported:,
-                                     category: SalesTaxes::Catalog::Category.for(name))
+  def build_product(name, price_cents)
+    SalesTaxes::Catalog::Product.from_name(name, price_cents:)
   end
 
-  def build_item(quantity, name, price_cents, imported: false)
-    SalesTaxes::Checkout::LineItem.new(quantity:, product: build_product(name, price_cents, imported:))
+  def build_item(quantity, name, price_cents)
+    SalesTaxes::Checkout::LineItem.new(quantity:, product: build_product(name, price_cents))
   end
 
   def build_receipt(*line_items)

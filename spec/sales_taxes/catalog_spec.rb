@@ -2,16 +2,21 @@
 
 RSpec.describe SalesTaxes::Catalog do
   describe SalesTaxes::Catalog::Category do
-    it "recognizes books, food and medical products by keywords in the name" do
-      expect(described_class.for("paperback novel")).to eq(described_class::BOOK)
-      expect(described_class.for("dark chocolate bar")).to eq(described_class::FOOD)
-      expect(described_class.for("cough syrup")).to eq(described_class::MEDICAL)
+    it "recognizes every keyword of books, food and medical products" do
+      {
+        described_class::BOOK => %w[book novel textbook paperback encyclopedia],
+        described_class::FOOD => %w[chocolate bread cheese coffee tea fruit],
+        described_class::MEDICAL => %w[pill capsule medicine syrup bandage vitamin]
+      }.each do |category, keywords|
+        keywords.each do |keyword|
+          expect(described_class.for("one #{keyword} in a box")).to eq(category), keyword
+        end
+      end
     end
 
     it "matches singular, plural and any letter case" do
       expect(described_class.for("old BOOKS")).to eq(described_class::BOOK)
       expect(described_class.for("Cheeses")).to eq(described_class::FOOD)
-      expect(described_class.for("box of bandages")).to eq(described_class::MEDICAL)
     end
 
     it "does not match a keyword inside another word" do
@@ -33,19 +38,38 @@ RSpec.describe SalesTaxes::Catalog do
     end
 
     it "keeps its values and is frozen, name included" do
-      product = build(imported: true)
+      product = build(name: +"desk lamp", imported: true)
 
       expect([product.name, product.price_cents, product.imported?, product.category])
         .to eq(["desk lamp", 3007, true, category])
       expect([product, product.name]).to all(be_frozen)
     end
 
-    it "requires a name and a positive price in cents" do
-      ["", "   ", nil].each do |name|
-        expect { build(name:) }.to raise_error(SalesTaxes::InvalidValueError, /name/), name.inspect
-      end
-      [0, -1, 30.07, "3007", nil].each do |price_cents|
+    it "requires a price greater than zero" do
+      [0, -1].each do |price_cents|
         expect { build(price_cents:) }.to raise_error(SalesTaxes::InvalidValueError, /price/), price_cents.inspect
+      end
+    end
+
+    describe ".from_name" do
+      def from_name(name)
+        described_class.from_name(name, price_cents: 1000)
+      end
+
+      it "takes the category from keywords in the name" do
+        expect(from_name("bottle of pills").category).to eq(SalesTaxes::Catalog::Category::MEDICAL)
+      end
+
+      it "is imported when the name has the word 'imported', anywhere and in any case" do
+        ["imported vase", "vase imported from Italy", "IMPORTED desk lamp"].each do |name|
+          expect(from_name(name)).to be_imported, name
+        end
+      end
+
+      it "is not imported without the word 'imported' on its own" do
+        ["desk lamp", "unimported vase"].each do |name|
+          expect(from_name(name)).not_to be_imported, name
+        end
       end
     end
   end

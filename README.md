@@ -4,54 +4,49 @@ Prints shopping receipts with basic sales tax and import duty.
 
 ## Requirements
 
-- Ruby 4.0 (tested with 4.0.9). The version is pinned in `.ruby-version`, so rbenv, asdf or chruby pick it up automatically.
-- Bundler, which ships with Ruby.
+- Ruby 4.0 (tested with 4.0.9). The version is pinned in `.ruby-version`.
+- Bundler.
 
-There are no runtime dependencies. RSpec is the only gem, and it is used only for the tests.
+There are no runtime dependencies. RSpec is used only for the tests.
 
 ## Proposal
 
-The application reads a shopping basket and prints its receipt: each item with its price including taxes, then the total sales taxes paid and the total cost.
+The application reads a shopping basket and prints its receipt: each item with its price including taxes, then the total sales taxes and the total cost.
 
-**Basket.** Each line is one purchase in the format `<quantity> <product name> at <price>`, for example `2 book of poems at 10.00`. A product is imported when its name contains the word "imported". The product type (book, food, medical or other) comes from keywords in the name, since the input does not state it.
+Basket: each line is one purchase, `<quantity> <product name> at <price>`, for example `2 book of poems at 10.00`. A product is imported when its name has the word "imported". The input does not say the product type (book, food, medical or other), so it comes from keywords in the name.
 
-**Taxes.**
+Taxes:
 - Basic sales tax: 10% on every product, except books, food and medical products.
 - Import duty: 5% on every imported product, with no exemptions.
-- Each tax is calculated on the unit price, rounded up to the nearest 0.05, and then multiplied by the quantity.
+- Each tax is rounded up to the nearest 0.05.
 
-**Input.** A basket can come from a text file or be typed in the terminal, one line at a time, finishing with an empty line. Several files can be given at once; each one gets its own receipt under its file name.
+Input: a text file, or standard input when no file is given.
 
-**Errors.** A basket with a problem (a line in the wrong format, an invalid value such as a zero quantity, no items at all, or a file that cannot be read) prints a clear message instead of a receipt, because a receipt missing an item would be wrong. When several files are given, the others are still processed.
+Errors: when the basket has a problem (a line in the wrong format, a zero quantity, no items, a file that cannot be read), the application prints an error and no receipt. One invalid line is enough to reject the basket, because a receipt with a missing item would be wrong.
 
 ## Assumptions
 
-- **Product type comes from keywords in the name.** The keywords cover the problem description's examples plus a few common words, and they are all listed in `Catalog::Category`, so the list is easy to extend:
+- The input must follow the format of the problem description: the quantity in digits, the name, " at " and a price with two decimals (`12.49`, or `.90` below one), all separated by single spaces. Extra spaces, tabs, `12.5` or `AT` are rejected with the line number. I chose not to guess, because a wrong guess prints a wrong receipt. Blank lines are skipped, lines can end in LF, CRLF or CR, and a byte order mark at the start is ignored.
+- Quantities and prices must be greater than zero.
+- The product type comes from keywords in the name, listed in `Catalog::Category`:
   - Books: book, novel, textbook, paperback, encyclopedia.
   - Food: chocolate, bread, cheese, coffee, tea, fruit.
-  - Medical: pill, tablet, medicine, syrup, bandage, vitamin.
+  - Medical: pill, capsule, medicine, syrup, bandage, vitamin.
 
-  A keyword matches in singular or plural (an added "s" or "es") and in any letter case, but only as a whole word:
-  - "old BOOKS" is a book;
-  - "notebook" is not a book, and "pillow" is not medical.
+  A keyword matches as a whole word, in singular or plural (with an "s") and in any letter case. "old BOOKS" is a book, "notebook" is not. A hyphen splits words, so "e-book" is also a book. A product without a keyword is taxed, since only these three types are exempt.
 
-  Any other product is taxed, because the problem description exempts only these three types. A real system would take the type from its product catalog.
-- **"imported" is a whole word anywhere in the name**, in any letter case. The name is printed exactly as it was written.
-- **Tax is calculated per unit, then multiplied by the quantity.** The problem description's third example needs it. For 3 imported boxes of chocolates at 11.25:
+  This is a simple guess and it can be wrong: "steaks" are taxed because "steak" is not a keyword, and "headache tablets" are taxed because I left "tablet" out, so a tablet computer is not exempt. A real system would get the type from a product catalog.
+- "imported" must be a whole word, in any position and letter case. Negations are not understood, so "non-imported" still counts as imported.
+- Tax is calculated for one unit and then multiplied by the quantity. The third example only works this way. For 3 imported boxes of chocolates at 11.25:
   - per unit: 3 × (11.25 + 0.60) = 35.55, the expected output;
-  - on the whole line: 33.75 + 1.70 = 35.45, which does not match.
-- **Each tax is rounded on its own**, then the two are added. The problem description gives the rule per tax rate ("for a tax rate of n%..."), and in practice each tax is a separate obligation. Rounding the combined 15% once also matches its examples, but not every price. At 1.01:
+  - for the whole line: 33.75 + 1.70 = 35.45, which is wrong.
+- Each tax is rounded on its own and then added, because the rounding rule is given per tax rate ("for a tax rate of n%..."). Rounding the combined 15% gives the same results for the examples, but not for every price. At 1.01:
   - each tax on its own: 0.15 + 0.10 = 0.25;
-  - the combined 15% once: 0.1515, rounded to 0.20.
+  - the combined 15%: 0.1515, rounded to 0.20.
 
-  A test covers this case.
-- **Prices** have up to two decimals and must be greater than zero:
-  - accepted: `12`, `12.5`, `12.50`;
-  - rejected: `12.505`, `0`, `-1`, `12,50` (a comma would make `1,000` ambiguous).
-- **Quantities** are whole numbers greater than zero.
-- **The last " at " separates the name from the price**, so names may contain "at" or numbers, as in `1 painting of a cat at night at 12.00`.
-- **One invalid line rejects its whole basket**, because a receipt missing an item would be wrong.
-- **Lines keep their input order**, and the same product on two lines prints as two lines.
+  The Calculator spec has a test for this case.
+- The price comes after the last " at ", so a name can contain "at" or numbers, like `1 painting of a cat at night at 12.00`.
+- Lines are printed in the input order, and the same product on two lines prints as two lines.
 
 ## Setup
 
@@ -60,9 +55,33 @@ ruby -v          # should print ruby 4.0.x
 bundle install
 ```
 
-On Windows, Ruby 4.0 can be installed with [RubyInstaller](https://rubyinstaller.org/) (for example `winget install RubyInstallerTeam.Ruby.4.0`). On macOS or Linux, use your version manager, for example `rbenv install 4.0.9`.
+On Windows, install Ruby 4.0 with [RubyInstaller](https://rubyinstaller.org/). On macOS or Linux, use a version manager, like `rbenv install 4.0.9`.
 
 ## How to run
+
+The `input` folder has the three baskets from the problem description.
+
+```bash
+bin/receipt input/basket_1.txt
+```
+
+```
+2 book: 24.98
+1 music CD: 16.49
+1 chocolate bar: 0.85
+Sales Taxes: 1.50
+Total: 42.32
+```
+
+Without a file, the basket is read from standard input:
+- piped: `cat input/basket_2.txt | bin/receipt`;
+- typed: run `bin/receipt`, type one item per line and finish with an empty line. A hint on stderr says so.
+
+On Windows cmd or PowerShell, run it with Ruby: `ruby bin/receipt input/basket_1.txt`.
+
+The receipt goes to stdout and errors go to stderr. The exit status is 0 when the receipt is printed and 1 when the input has an error. With more than one file, it prints the usage.
+
+To save the receipt to a file, redirect stdout: `bin/receipt input/basket_1.txt > receipt.txt`.
 
 ## How to test
 
@@ -70,41 +89,46 @@ On Windows, Ruby 4.0 can be installed with [RubyInstaller](https://rubyinstaller
 bundle exec rspec
 ```
 
+`spec/sales_taxes` follows the structure of `lib`, plus `thread_safety_spec.rb`. `spec/acceptance` runs `bin/receipt` as a real process, including the three sample baskets.
+
 ## Design
 
-The code is in `lib/sales_taxes`, one class per file, grouped by module:
+The code is in `lib/sales_taxes`. Each class or module has its own file, except the error classes, which are together in `errors.rb`.
 
 | Module | Classes | Job |
 |---|---|---|
 | `Money` | | Turns price text into Integer cents and back |
-| `Catalog` | `Category`, `Product` | What is being bought |
+| `Catalog` | `Category`, `Product` | What is being bought, with its type and origin taken from the name |
 | `Taxes` | `Rounding`, `BasicSalesTax`, `ImportDuty`, `Calculator` | How much tax one unit pays |
 | `Checkout` | `LineItem`, `Receipt`, `ReceiptFormatter` | The basket, its totals and the printed text |
+| `SalesTaxes` (top level) | `InputParser` | Turns the basket text into line items |
+| `SalesTaxes` (top level) | `CLI` | Reads a file or standard input and prints the receipt |
 
-Objects hold each other instead of inheriting from each other:
-- a `Product` has a `Category`;
-- a `LineItem` has a quantity and a `Product`;
-- a `Receipt` is built from `LineItem`s and a `Calculator`;
-- a `Calculator` has a list of tax rules.
+The objects use composition, not inheritance:
+- `Product` has a `Category`;
+- `LineItem` has a quantity and a `Product`;
+- `Receipt` is built from `LineItem`s and a `Calculator`;
+- `Calculator` has a list of tax rules;
+- `CLI` gets a parser, a calculator and a formatter in its constructor, with defaults, so the tests can replace them.
 
-**Tax rules are composed, not inherited.** Each rule is a small class that answers `amount_for(product)`, and `Calculator` adds up whatever rules it is given. A new tax is a new class passed to the calculator, with no change to the others. The two rules only share the rounding, which is already its own module (`Taxes::Rounding`), so a base class would save two lines and tie the rules together.
+Tax rules: each rule has `amount_for(product)`, and `Calculator` adds the results. A new tax is a new rule passed to the calculator. There is no base class, because the rules only share the rounding, which is in `Taxes::Rounding`.
 
-**Exemptions belong to the tax, not to the category.** `BasicSalesTax` keeps the list of exempt categories, because the exemption is part of that tax's rule. The import duty has no exemptions.
+Exemptions: the exempt categories are listed in `BasicSalesTax`, because the exemption belongs to that tax. The import duty has none.
 
-**Errors.** Every input problem the user can cause is a subclass of `SalesTaxes::Error` (`InputFileError`, `EmptyBasketError`, `MalformedLineError`, `InvalidValueError`). Anything else is a bug and is not rescued. For example, a negative value reaching `Taxes::Rounding` can only come from a bug, so it raises a plain `ArgumentError`.
+Errors: input problems are subclasses of `SalesTaxes::Error`, and `CLI` rescues that class. `InputParser` checks the line format, `Money` the price format, and `Product` and `LineItem` that values are greater than zero. Any other error is a bug and is not rescued.
 
-**Thread safety.** Every object is frozen once it is built, inner lists included, and no object changes after that. The same calculator or receipt can be shared between threads without locks.
+Thread safety: products, line items, receipts and their lines, and the calculator and its list of rules are frozen after they are built. The parser, the formatter and the tax rules have no state. So these objects can be shared between threads without locks. `CLI` cannot, because it holds the input and output streams.
 
 ## How taxes are calculated
 
-For each unit, every rule returns its tax already rounded up to the nearest 0.05, and `Calculator` adds them. In cents:
+Each rule returns the tax for one unit, already rounded up to 0.05, and `Calculator` adds them. In cents:
 
 ```
 tax = (price × rate / 100) rounded up to a multiple of 5
     = (price × rate).ceildiv(500) × 5
 ```
 
-`ceildiv` is Ruby's integer division that rounds up, so the whole calculation stays in integers. For an imported, taxable product at 1.01:
+`ceildiv` divides and rounds up, so the math stays in integers. For an imported, taxable product at 1.01:
 
 | Rule | Exact | Rounded |
 |---|---|---|
@@ -112,20 +136,24 @@ tax = (price × rate / 100) rounded up to a multiple of 5
 | Import duty (5%) | 0.0505 | 0.10 |
 | Tax for one unit | | 0.25 |
 
-Each receipt line costs (unit price + unit tax) × quantity. Sales Taxes and Total are the sums of the lines.
-
 ## Money representation
 
-Prices are Integer cents from the moment they are read until they are printed.
+I store money as Integer cents, from reading the price to printing the receipt. `Money` is the only place that converts text to cents and back.
 
-- **Float** cannot store most decimal values exactly (`0.1 + 0.2` is `0.30000000000000004`), and a receipt must be exact to the cent.
-- **Rational** would be exact, but it is more than this problem needs. Prices have at most two decimals and taxes are rounded to 0.05, so every value is a whole number of cents.
-- **BigDecimal** would also be exact, but since Ruby 3.4 it is a bundled gem that has to be added to the Gemfile, and the problem description asks for no external libraries.
+I chose Integer over the other numeric types Ruby has for money:
 
-`Money` is the only place that converts between text and cents, so the rest of the code only sees integers.
+- Float: most decimal values are not exact (`0.1 + 0.2` is `0.30000000000000004`), and a receipt must be exact to the cent.
+- Rational: exact, but more than needed here. Prices have two decimals and taxes are rounded to 0.05, so every value is a whole number of cents.
+- BigDecimal: also exact, but since Ruby 3.4 it is a bundled gem that must be added to the Gemfile, and the problem description asks for no external libraries.
 
 ## What was left out
 
-- Matching irregular plurals and other word forms (for example with `ActiveSupport::Inflector` or a stemmer). The problem description does not allow external libraries, and every keyword in the list has a regular plural, so an optional "s" or "es" is enough.
-- Taking the product type from a product catalog, or from a category list kept by the business, instead of keywords in the name. The type is decided in one place, so its source can change without touching the rest of the code.
-- Reporting every invalid line of a file at once (with a cap, so a badly formatted file does not flood the output). Today the first invalid line stops that file, and its error names the line, the product and the field.
+What I would add with more time, or in a real system:
+
+- A product catalog. Today the type and the import flag are guessed from the name in `Catalog::Product.from_name`, and a catalog lookup would replace that method.
+- Irregular plurals and other word forms, for example with `ActiveSupport::Inflector`. It is an external library, which the problem description does not allow, and all keywords today have a regular plural.
+- Decimal tax rates, like 2.5%. Today the rates are whole percentages.
+- A more forgiving input format, with extra spaces, tabs or prices like `12.5`. Today the input must follow the format of the problem description exactly.
+- Several files in one call. Today a shell loop does the same: `for f in input/*.txt; do bin/receipt "$f"; done`.
+- `--help` and Ctrl+C handling.
+- Reporting all invalid lines at once. Today the first invalid line stops the basket, and the error shows its line number.

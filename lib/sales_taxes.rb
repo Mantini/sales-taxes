@@ -11,6 +11,8 @@ require_relative "sales_taxes/taxes/calculator"
 require_relative "sales_taxes/checkout/line_item"
 require_relative "sales_taxes/checkout/receipt"
 require_relative "sales_taxes/checkout/receipt_formatter"
+require_relative "sales_taxes/input_parser"
+require_relative "sales_taxes/cli"
 
 # Prints shopping receipts with basic sales tax and import duty.
 module SalesTaxes

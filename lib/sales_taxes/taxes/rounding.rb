@@ -7,11 +7,9 @@ module SalesTaxes
     module Rounding
       STEP_CENTS = 5
 
-      # Integer math only. price * rate / 100 is the tax in cents, and ceildiv
-      # rounds it up to the next 5 cents in the same step.
+      # price * rate / 100 is the tax in cents. ceildiv rounds that division up to the
+      # next multiple of 5 cents, so the whole calculation stays in integers.
       def self.tax_cents(price_cents:, rate_percent:)
-        raise ArgumentError, "price and rate must not be negative" if price_cents.negative? || rate_percent.negative?
-
         (price_cents * rate_percent).ceildiv(100 * STEP_CENTS) * STEP_CENTS
       end
     end

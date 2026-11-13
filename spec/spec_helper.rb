@@ -9,4 +9,6 @@ RSpec.configure do |config|
   config.expect_with(:rspec) { |c| c.syntax = :expect }
   config.order = :random
   config.include Builders
+  # Examples that check several cases report every failing case, not only the first one.
+  config.define_derived_metadata { |meta| meta[:aggregate_failures] = true }
 end

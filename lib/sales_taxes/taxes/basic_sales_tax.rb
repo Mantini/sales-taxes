@@ -7,10 +7,6 @@ module SalesTaxes
       RATE_PERCENT = 10
       EXEMPT = [Catalog::Category::BOOK, Catalog::Category::FOOD, Catalog::Category::MEDICAL].freeze
 
-      def initialize
-        freeze
-      end
-
       def amount_for(product)
         return 0 if EXEMPT.include?(product.category)
 

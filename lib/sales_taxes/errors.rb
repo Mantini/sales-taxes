@@ -5,13 +5,13 @@ module SalesTaxes
   # Anything else is a bug and should not be rescued.
   class Error < StandardError; end
 
-  # The file is missing, is a directory or is not valid text.
+  # The file is missing, is a directory or cannot be read.
   class InputFileError < Error; end
 
   # The input has no items.
   class EmptyBasketError < Error; end
 
-  # A line does not follow "<quantity> <product name> at <price>".
+  # A line does not follow "<quantity> <product name> at <price>", or the input is not valid text.
   class MalformedLineError < Error; end
 
   # A line has the right shape, but a value is not allowed (a zero quantity, a bad price).

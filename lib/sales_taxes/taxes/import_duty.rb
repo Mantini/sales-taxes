@@ -6,10 +6,6 @@ module SalesTaxes
     class ImportDuty
       RATE_PERCENT = 5
 
-      def initialize
-        freeze
-      end
-
       def amount_for(product)
         return 0 unless product.imported?
 
